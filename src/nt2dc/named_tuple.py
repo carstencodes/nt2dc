@@ -17,10 +17,8 @@ from typing import (
 )
 from dataclasses import make_dataclass as make_real_dataclass
 from collections.abc import Iterable
-from sys import modules, version_info as python_version
-from inspect import isclass
+from sys import version_info as python_version
 from importlib import import_module
-import typing
 
 from .builtins import BuiltInReplacements, BuiltInNames
 
@@ -79,7 +77,7 @@ def _get_target_data_type_dc(
             origin = generic_type_mapping[origin]
         origin = _get_target_data_type_dc(origin)
         value = _make_generic_type(origin, items)
-    elif isclass(value) and issubclass(value, NamedTuple):
+    elif _is_namedtuple_instance(value):
         value = make_dataclass(value)
 
     return value
@@ -87,17 +85,17 @@ def _get_target_data_type_dc(
 
 def _make_generic_type(generic_base: Type, generic_args: List[Type]) -> Type:
     _globals: Dict[str, Any] = {}
-    def qualname(tp) -> str:
-        if hasattr(tp, '__module__'):
-            module: Any = import_module(tp.__module__)
-            _globals[tp.__module__] = module
-        if tp in BuiltInNames.keys():
-            return BuiltInNames[tp]
+    def qualname(queried_type) -> str:
+        if hasattr(queried_type, '__module__'):
+            module: Any = import_module(queried_type.__module__)
+            _globals[queried_type.__module__] = module
+        if queried_type in BuiltInNames.keys():
+            return BuiltInNames[queried_type]
 
-        if hasattr(tp, '__qualname__'):
-            return tp.__qualname__
+        if hasattr(queried_type, '__qualname__'):
+            return queried_type.__qualname__
 
-        return tp.__name__
+        return queried_type.__name__
 
     base_type_name: str = qualname(generic_base)
     generic_arg_names: List[str] = [qualname(t) for t in generic_args]
@@ -170,3 +168,10 @@ def _narrow_named_tuple_instance(
         result[key] = value
 
     return result
+
+def _is_namedtuple_instance(obj: Any) -> bool:
+    is_tuple: bool = isinstance(obj, tuple)
+    has_asdict_method: bool = hasattr(obj, '_asdict')
+    has_fields_class_member: bool = hasattr(obj, '_fields')
+
+    return is_tuple and has_asdict_method and has_fields_class_member
