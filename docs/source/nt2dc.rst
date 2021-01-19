@@ -1,10 +1,10 @@
-__project__ package
+nt2dc package
 ==============
 
 Module contents
 ---------------
 
-.. automodule:: __project__
+.. automodule:: nt2dc
    :members:
    :undoc-members:
    :show-inheritance:
