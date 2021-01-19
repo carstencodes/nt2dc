@@ -85,14 +85,15 @@ def _get_target_data_type_dc(
 
 def _make_generic_type(generic_base: Type, generic_args: List[Type]) -> Type:
     _globals: Dict[str, Any] = {}
+
     def qualname(queried_type) -> str:
-        if hasattr(queried_type, '__module__'):
+        if hasattr(queried_type, "__module__"):
             module: Any = import_module(queried_type.__module__)
             _globals[queried_type.__module__] = module
         if queried_type in BuiltInNames.keys():
             return BuiltInNames[queried_type]
 
-        if hasattr(queried_type, '__qualname__'):
+        if hasattr(queried_type, "__qualname__"):
             return queried_type.__qualname__
 
         return queried_type.__name__
@@ -137,28 +138,31 @@ def get_dataclass_object(
 
 
 def _narrow_named_tuple_instance(
-        instance: Any,
-        generic_type_mapping: Mapping[Type, Type] = __BUILT_IN_REPLACEMENTS__,
-    ) -> Dict[str, Any]:
+    instance: Any,
+    generic_type_mapping: Mapping[Type, Type] = __BUILT_IN_REPLACEMENTS__,
+) -> Dict[str, Any]:
     result: Dict[str, Any] = {}
     for key, value in instance._asdict().items():
         key_type: Type = type(value)
         if value is NamedTuple:
-            value = _narrow_named_tuple_instance(
-                value, generic_type_mapping
-            )
+            value = _narrow_named_tuple_instance(value, generic_type_mapping)
         elif value is Iterable:
             items = {v is NamedTuple for v in value}
             if True in items:
                 narrowed_items = []
                 for item in value:
-                    narrowed_items.append(_narrow_named_tuple_instance(
-                        item, generic_type_mapping
-                    ))
+                    narrowed_items.append(
+                        _narrow_named_tuple_instance(
+                            item, generic_type_mapping
+                        )
+                    )
 
                 value = narrowed_items
 
-        if key_type in generic_type_mapping.keys():
+        if (
+            generic_type_mapping is not None
+            and key_type in generic_type_mapping.keys()
+        ):
             target_type: Type = generic_type_mapping[key_type]
             ctor = target_type
             if target_type in __BUILT_IN_CONSTRUCTORS__.keys():
@@ -169,9 +173,10 @@ def _narrow_named_tuple_instance(
 
     return result
 
+
 def _is_namedtuple_instance(obj: Any) -> bool:
     is_tuple: bool = isinstance(obj, tuple)
-    has_asdict_method: bool = hasattr(obj, '_asdict')
-    has_fields_class_member: bool = hasattr(obj, '_fields')
+    has_asdict_method: bool = hasattr(obj, "_asdict")
+    has_fields_class_member: bool = hasattr(obj, "_fields")
 
     return is_tuple and has_asdict_method and has_fields_class_member
