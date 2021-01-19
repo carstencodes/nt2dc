@@ -6,17 +6,18 @@ import unittest
 import nt2dc
 
 
-list_type=List[int]
-dict_type=Dict[str, int]
-tuple_type=Tuple[int, float, bool]
-frozenset_type=FrozenSet[int]
+list_type = List[int]
+dict_type = Dict[str, int]
+tuple_type = Tuple[int, float, bool]
+frozenset_type = FrozenSet[int]
 
 
 if sys.version_info.major == 3 and sys.version_info.minor >= 9:
-    list_type=list[int]
-    dict_type=dict[str, int]
-    tuple_type=tuple[int, float, bool]
-    frozenset_type=frozenset[int]
+    list_type = list[int]
+    dict_type = dict[str, int]
+    tuple_type = tuple[int, float, bool]
+    frozenset_type = frozenset[int]
+
 
 class SimpleNamedTuple(NamedTuple):
     a: int
