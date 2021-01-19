@@ -6,6 +6,18 @@ import unittest
 import nt2dc
 
 
+list_type=List[int]
+dict_type=Dict[str, int]
+tuple_type=Tuple[int, float, bool]
+frozenset_type=FrozenSet[int]
+
+
+if sys.version_info.major == 3 and sys.version_info.minor >= 9:
+    list_type=list[int]
+    dict_type=dict[str, int]
+    tuple_type=tuple[int, float, bool]
+    frozenset_type=frozenset[int]
+
 class SimpleNamedTuple(NamedTuple):
     a: int
     b: float
@@ -16,9 +28,9 @@ class SimpleNameTupleWithGenericTypes(NamedTuple):
     a: int
     b: float
     c: bool
-    d: Tuple[int, float, bool]
-    e: Dict[str, int]
-    f: List[int]
+    d: tuple_type
+    e: dict_type
+    f: list_type
 
 
 class NamedTupleWithReplacement(NamedTuple):
@@ -94,13 +106,13 @@ class NamedTupleWithReplacementTest(unittest.TestCase):
         dc = nt2dc.make_dataclass(NamedTupleWithReplacement)
         flds = fields(dc)
         self.assertEqual(flds[1].name, "b")
-        self.assertEqual(flds[1].type, FrozenSet[int])
+        self.assertEqual(flds[1].type, frozenset_type)
 
     def test_make_dataclass_replace_fields_b(self):
         dc = nt2dc.make_dataclass(NamedTupleWithReplacement, self.replace)
         flds = fields(dc)
         self.assertEqual(flds[1].name, "b")
-        self.assertEqual(flds[1].type, List[int])
+        self.assertEqual(flds[1].type, list_type)
 
     def test_make_dataclass_fields_c(self):
         dc = nt2dc.make_dataclass(NamedTupleWithReplacement)
