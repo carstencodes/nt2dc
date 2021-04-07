@@ -11,6 +11,7 @@
 
 from typing import (
     FrozenSet,
+    Optional,
     Set,
     Mapping,
     Type,
@@ -64,7 +65,9 @@ def make_dataclass(
         value = _get_target_data_type_dc(value, generic_type_mapping)
         type_hints.append((key, value))
 
-    return make_real_dataclass(clz.__name__ + "DataClass", type_hints)
+    result_class: Type = make_real_dataclass(clz.__name__ + "DataClass", type_hints)
+    result_class.__nt_as_dc = True
+    return result_class
 
 
 def _get_target_data_type_dc(
@@ -85,7 +88,7 @@ def _get_target_data_type_dc(
             origin = generic_type_mapping[origin]
         origin = _get_target_data_type_dc(origin)
         value = _make_generic_type(origin, items)
-    elif _is_namedtuple_instance(value):
+    elif _is_namedtuple_class(value):
         value = make_dataclass(value)
 
     return value
@@ -94,26 +97,53 @@ def _get_target_data_type_dc(
 def _make_generic_type(generic_base: Type, generic_args: List[Type]) -> Type:
     _globals: Dict[str, Any] = {}
 
+    def get_module(module_name: str) -> Optional[Any]:
+        if len(module_name) == 0:
+            return None
+
+        module: Any = import_module(module_name)
+        _globals[module_name] = module
+        recurse_module_name: str = ""
+        if hasattr(module, '__module__'):
+            recurse_module_name = module.__module__
+        elif hasattr(module, '__package__'):
+            recurse_module_name = module.__package__
+
+        if len(recurse_module_name) and recurse_module_name != module_name:
+            _ = get_module(recurse_module_name)
+
+        return module
+
     def qualname(queried_type) -> str:
+        if hasattr(queried_type, '__nt_as_dc') and queried_type.__nt_as_dc:
+            _globals[queried_type.__name__] = queried_type
+            return queried_type.__name__
+
         prefix: str = ""
         if hasattr(queried_type, "__module__"):
-            module: Any = import_module(queried_type.__module__)
-            _globals[queried_type.__module__] = module
-            prefix = "{}.".format(module.__name__)
+            module: Optional[Any] = get_module(queried_type.__module__)
+            if module is not None:
+                prefix = "{}.".format(module.__name__)
         if queried_type in BuiltInNames.keys():
             return BuiltInNames[queried_type]
 
         if hasattr(queried_type, "__qualname__"):
             return prefix + queried_type.__qualname__
 
-        return prefix + queried_type.__name__
+        if hasattr(queried_type, "__name__"):
+            return prefix + queried_type.__name__
+
+        return str(queried_type)
 
     base_type_name: str = qualname(generic_base)
-    generic_arg_names: List[str] = [qualname(t) for t in generic_args]
+    generic_args_dc: List[Type] = [ _get_target_data_type_dc(t) for t in generic_args ]
+    generic_arg_names: List[str] = [qualname(t) for t in generic_args_dc]
     generic_arg_names_value = ", ".join(generic_arg_names)
     target_type_qualified_name = "{}[{}]".format(
         base_type_name, generic_arg_names_value
     )
+
+
     # At this stage, there is no other way than using an eval statement
     # with a qualified name like list[int] or typing.Dict[str, str]
     # pylint: disable=W0123
@@ -183,10 +213,15 @@ def _narrow_named_tuple_instance(
 
     return result
 
+def _is_namedtuple_class(clz: Type) -> bool:
+    clz_fields: Dict[str, Any] = clz.__dict__
+    has_asdict_method: bool = "_asdict" in clz_fields.keys()
+    has_fields_class_member: bool = "_fields" in clz_fields.keys()
+    return has_asdict_method and has_fields_class_member
+
+
 
 def _is_namedtuple_instance(obj: Any) -> bool:
     is_tuple: bool = isinstance(obj, tuple)
-    has_asdict_method: bool = hasattr(obj, "_asdict")
-    has_fields_class_member: bool = hasattr(obj, "_fields")
 
-    return is_tuple and has_asdict_method and has_fields_class_member
+    return is_tuple and _is_namedtuple_class(obj.__class__)
