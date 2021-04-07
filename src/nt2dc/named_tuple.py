@@ -65,8 +65,10 @@ def make_dataclass(
         value = _get_target_data_type_dc(value, generic_type_mapping)
         type_hints.append((key, value))
 
-    result_class: Type = make_real_dataclass(clz.__name__ + "DataClass", type_hints)
-    result_class.__nt_as_dc = True
+    result_class: Type = make_real_dataclass(
+        clz.__name__ + "DataClass", type_hints
+    )
+    setattr(result_class, "__nt_as_dc", True)
     return result_class
 
 
@@ -104,18 +106,20 @@ def _make_generic_type(generic_base: Type, generic_args: List[Type]) -> Type:
         module: Any = import_module(module_name)
         _globals[module_name] = module
         recurse_module_name: str = ""
-        if hasattr(module, '__module__'):
+        if hasattr(module, "__module__"):
             recurse_module_name = module.__module__
-        elif hasattr(module, '__package__'):
+        elif hasattr(module, "__package__"):
             recurse_module_name = module.__package__
 
-        if len(recurse_module_name) and recurse_module_name != module_name:
+        if len(recurse_module_name) > 0 and recurse_module_name != module_name:
             _ = get_module(recurse_module_name)
 
         return module
 
     def qualname(queried_type) -> str:
-        if hasattr(queried_type, '__nt_as_dc') and queried_type.__nt_as_dc:
+        if hasattr(queried_type, "__nt_as_dc") and bool(
+            getattr(queried_type, "__nt_as_dc")
+        ):
             _globals[queried_type.__name__] = queried_type
             return queried_type.__name__
 
@@ -136,13 +140,14 @@ def _make_generic_type(generic_base: Type, generic_args: List[Type]) -> Type:
         return str(queried_type)
 
     base_type_name: str = qualname(generic_base)
-    generic_args_dc: List[Type] = [ _get_target_data_type_dc(t) for t in generic_args ]
+    generic_args_dc: List[Type] = [
+        _get_target_data_type_dc(t) for t in generic_args
+    ]
     generic_arg_names: List[str] = [qualname(t) for t in generic_args_dc]
     generic_arg_names_value = ", ".join(generic_arg_names)
     target_type_qualified_name = "{}[{}]".format(
         base_type_name, generic_arg_names_value
     )
-
 
     # At this stage, there is no other way than using an eval statement
     # with a qualified name like list[int] or typing.Dict[str, str]
@@ -213,12 +218,12 @@ def _narrow_named_tuple_instance(
 
     return result
 
+
 def _is_namedtuple_class(clz: Type) -> bool:
     clz_fields: Dict[str, Any] = clz.__dict__
     has_asdict_method: bool = "_asdict" in clz_fields.keys()
     has_fields_class_member: bool = "_fields" in clz_fields.keys()
     return has_asdict_method and has_fields_class_member
-
 
 
 def _is_namedtuple_instance(obj: Any) -> bool:
