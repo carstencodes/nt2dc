@@ -94,4 +94,5 @@ BuiltInNames: typing.Dict[typing.Type, str] = {
     typing.Awaitable: "typing.Awaitable",
     typing.ContextManager: "typing.ContextManager",
     typing.AsyncContextManager: "typing.AsyncContextManager",
+    typing.Union: "typing.Union",
 }
