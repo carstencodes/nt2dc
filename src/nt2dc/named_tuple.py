@@ -95,16 +95,18 @@ def _make_generic_type(generic_base: Type, generic_args: List[Type]) -> Type:
     _globals: Dict[str, Any] = {}
 
     def qualname(queried_type) -> str:
+        prefix: str = ""
         if hasattr(queried_type, "__module__"):
             module: Any = import_module(queried_type.__module__)
             _globals[queried_type.__module__] = module
+            prefix = "{}.".format(module.__name__)
         if queried_type in BuiltInNames.keys():
             return BuiltInNames[queried_type]
 
         if hasattr(queried_type, "__qualname__"):
-            return queried_type.__qualname__
+            return prefix + queried_type.__qualname__
 
-        return queried_type.__name__
+        return prefix + queried_type.__name__
 
     base_type_name: str = qualname(generic_base)
     generic_arg_names: List[str] = [qualname(t) for t in generic_args]
