@@ -48,6 +48,9 @@ __BUILT_IN_CONSTRUCTORS__ = {
 def make_dataclass(
     clz: Type[NamedTuple],
     generic_type_mapping: Mapping[Type, Type] = __BUILT_IN_REPLACEMENTS__,
+    *,
+    prefix: str = "",
+    suffix: str = "DataClass",
 ) -> Type[object]:
     """Creates a dataclass from the specified named tuple.
 
@@ -65,21 +68,26 @@ def make_dataclass(
         value = _get_target_data_type_dc(value, generic_type_mapping)
         type_hints.append((key, value))
 
-    result_class: Type = make_real_dataclass(
-        clz.__name__ + "DataClass", type_hints
-    )
+    target_name: str = "{}{}{}".format(prefix, clz.__name__, suffix)
+    result_class: Type = make_real_dataclass(target_name, type_hints)
     setattr(result_class, "__nt_as_dc", True)
     return result_class
 
 
 def _get_target_data_type_dc(
-    value: Type, generic_type_mapping: Mapping[Type, Type] = None
+    value: Type,
+    generic_type_mapping: Mapping[Type, Type] = None,
+    *,
+    prefix: str = "",
+    suffix: str = "",
 ) -> Type:
     args: Tuple = get_args(value)
     if len(args) > 0:
         items: List[Type] = []
         for arg in args:
-            arg = _get_target_data_type_dc(arg, generic_type_mapping)
+            arg = _get_target_data_type_dc(
+                arg, generic_type_mapping, prefix=prefix, suffix=suffix
+            )
             items.append(arg)
 
         origin: Type = get_origin(value)
@@ -88,10 +96,20 @@ def _get_target_data_type_dc(
             and origin in generic_type_mapping.keys()
         ):
             origin = generic_type_mapping[origin]
-        origin = _get_target_data_type_dc(origin, generic_type_mapping)
-        value = _make_generic_type(origin, items)
+        origin = _get_target_data_type_dc(
+            origin, generic_type_mapping, prefix=prefix, suffix=suffix
+        )
+        value = _make_generic_type(
+            origin,
+            items,
+            generic_type_mapping=generic_type_mapping,
+            prefix=prefix,
+            suffix=suffix,
+        )
     elif _is_namedtuple_class(value):
-        value = make_dataclass(value)
+        value = make_dataclass(
+            value, generic_type_mapping, prefix=prefix, suffix=suffix
+        )
 
     return value
 
@@ -101,6 +119,8 @@ def _make_generic_type(
     generic_args: List[Type],
     *,
     generic_type_mapping: Mapping[Type, Type] = None,
+    prefix: str = "",
+    suffix: str = "",
 ) -> Type:
     _globals: Dict[str, Any] = {}
 
@@ -146,7 +166,10 @@ def _make_generic_type(
 
     base_type_name: str = qualname(generic_base)
     generic_args_dc: List[Type] = [
-        _get_target_data_type_dc(t, generic_type_mapping) for t in generic_args
+        _get_target_data_type_dc(
+            t, generic_type_mapping, prefix=prefix, suffix=suffix
+        )
+        for t in generic_args
     ]
     generic_arg_names: List[str] = [qualname(t) for t in generic_args_dc]
     generic_arg_names_value = ", ".join(generic_arg_names)
