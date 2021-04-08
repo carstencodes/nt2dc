@@ -79,7 +79,7 @@ def _get_target_data_type_dc(
     if len(args) > 0:
         items: List[Type] = []
         for arg in args:
-            arg = _get_target_data_type_dc(arg)
+            arg = _get_target_data_type_dc(arg, generic_type_mapping)
             items.append(arg)
 
         origin: Type = get_origin(value)
@@ -88,7 +88,7 @@ def _get_target_data_type_dc(
             and origin in generic_type_mapping.keys()
         ):
             origin = generic_type_mapping[origin]
-        origin = _get_target_data_type_dc(origin)
+        origin = _get_target_data_type_dc(origin, generic_type_mapping)
         value = _make_generic_type(origin, items)
     elif _is_namedtuple_class(value):
         value = make_dataclass(value)
@@ -96,7 +96,12 @@ def _get_target_data_type_dc(
     return value
 
 
-def _make_generic_type(generic_base: Type, generic_args: List[Type]) -> Type:
+def _make_generic_type(
+    generic_base: Type,
+    generic_args: List[Type],
+    *,
+    generic_type_mapping: Mapping[Type, Type] = None,
+) -> Type:
     _globals: Dict[str, Any] = {}
 
     def get_module(module_name: str) -> Optional[Any]:
@@ -141,7 +146,7 @@ def _make_generic_type(generic_base: Type, generic_args: List[Type]) -> Type:
 
     base_type_name: str = qualname(generic_base)
     generic_args_dc: List[Type] = [
-        _get_target_data_type_dc(t) for t in generic_args
+        _get_target_data_type_dc(t, generic_type_mapping) for t in generic_args
     ]
     generic_arg_names: List[str] = [qualname(t) for t in generic_args_dc]
     generic_arg_names_value = ", ".join(generic_arg_names)
