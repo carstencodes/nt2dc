@@ -45,12 +45,29 @@ __BUILT_IN_CONSTRUCTORS__ = {
 }
 
 
+_type_cache: Dict[Type, Type] = {}
+
+
+def clear_cache() -> None:
+    """Clears the cache of generated classes.
+    """
+    _type_cache.clear()
+
+
+def _get_from_cache(clz: Type) -> Optional[Type]:
+    if clz in _type_cache.keys():
+        return _type_cache[clz]
+
+    return None
+
+
 def make_dataclass(
     clz: Type[NamedTuple],
     generic_type_mapping: Mapping[Type, Type] = __BUILT_IN_REPLACEMENTS__,
     *,
     prefix: str = "",
     suffix: str = "DataClass",
+    use_cache: bool = False,
 ) -> Type[object]:
     """Creates a dataclass from the specified named tuple.
 
@@ -63,6 +80,10 @@ def make_dataclass(
     Returns:
         Type[object]: The dataclass.
     """
+    if use_cache:
+        result: Type = _get_from_cache(clz)
+        if result is not None:
+            return result
     type_hints: List[Tuple[str, Type]] = []
     for key, value in get_type_hints(clz).items():
         value = _get_target_data_type_dc(value, generic_type_mapping)
@@ -71,6 +92,8 @@ def make_dataclass(
     target_name: str = "{}{}{}".format(prefix, clz.__name__, suffix)
     result_class: Type = make_real_dataclass(target_name, type_hints)
     setattr(result_class, "__nt_as_dc", True)
+    if use_cache:
+        _type_cache[clz] = result_class
     return result_class
 
 
@@ -80,13 +103,18 @@ def _get_target_data_type_dc(
     *,
     prefix: str = "",
     suffix: str = "",
+    use_cache: bool = False,
 ) -> Type:
     args: Tuple = get_args(value)
     if len(args) > 0:
         items: List[Type] = []
         for arg in args:
             arg = _get_target_data_type_dc(
-                arg, generic_type_mapping, prefix=prefix, suffix=suffix
+                arg,
+                generic_type_mapping,
+                prefix=prefix,
+                suffix=suffix,
+                use_cache=use_cache,
             )
             items.append(arg)
 
@@ -97,7 +125,11 @@ def _get_target_data_type_dc(
         ):
             origin = generic_type_mapping[origin]
         origin = _get_target_data_type_dc(
-            origin, generic_type_mapping, prefix=prefix, suffix=suffix
+            origin,
+            generic_type_mapping,
+            prefix=prefix,
+            suffix=suffix,
+            use_cache=use_cache,
         )
         value = _make_generic_type(
             origin,
@@ -105,10 +137,15 @@ def _get_target_data_type_dc(
             generic_type_mapping=generic_type_mapping,
             prefix=prefix,
             suffix=suffix,
+            use_cache=use_cache,
         )
     elif _is_namedtuple_class(value):
         value = make_dataclass(
-            value, generic_type_mapping, prefix=prefix, suffix=suffix
+            value,
+            generic_type_mapping,
+            prefix=prefix,
+            suffix=suffix,
+            use_cache=use_cache,
         )
 
     return value
@@ -121,6 +158,7 @@ def _make_generic_type(
     generic_type_mapping: Mapping[Type, Type] = None,
     prefix: str = "",
     suffix: str = "",
+    use_cache: bool = False,
 ) -> Type:
     _globals: Dict[str, Any] = {}
 
@@ -167,7 +205,11 @@ def _make_generic_type(
     base_type_name: str = qualname(generic_base)
     generic_args_dc: List[Type] = [
         _get_target_data_type_dc(
-            t, generic_type_mapping, prefix=prefix, suffix=suffix
+            t,
+            generic_type_mapping,
+            prefix=prefix,
+            suffix=suffix,
+            use_cache=use_cache,
         )
         for t in generic_args
     ]
@@ -187,6 +229,8 @@ def _make_generic_type(
 def get_dataclass_object(
     instance: NamedTuple,
     generic_type_mapping: Mapping[Type, Type] = __BUILT_IN_REPLACEMENTS__,
+    *,
+    use_cache: bool = False,
 ) -> Tuple[object, Type[object]]:
     """Creates a dataclass object from the specified named tuple instance.
 
@@ -200,7 +244,7 @@ def get_dataclass_object(
         Tuple[object, Type[object]]: The converted instance and its new type.
     """
     target_type: Type[object] = make_dataclass(
-        instance.__class__, generic_type_mapping
+        instance.__class__, generic_type_mapping, use_cache=use_cache
     )
     items_narrowed: Dict[str, Any] = _narrow_named_tuple_instance(
         instance, generic_type_mapping
